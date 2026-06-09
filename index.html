@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<!--
+Copyright 2011-16 Newcastle University
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<html lang="en-GB">
+    <head>
+        
+    <title>Test_deg_selv_tallregning - Numbas</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="resources/numbas-icon.png"/>
+
+    <!-- CSS -->
+<style>
+    /* This rule will be overriden in styles.css, so the page content is only shown when the stylesheet has loaded
+    */
+    @layer no-stylesheet {
+        body > #with-stylesheet {
+            display: none;
+        }
+    }
+</style>
+<link rel="stylesheet" type="text/css" href="numbas.css?build_time=1781011434.604134" />
+    <!-- mathjax stuff -->
+<script>
+/** A fake style element that uses a constructed CSSStyleSheet object
+*/
+class FakeStyleElement {
+    /**
+     * @param {Object.<string>} def - Attributes.
+     * @param {string} styles - CSS styles.
+     */
+    constructor(def, styles) {
+        Object.assign(this, def);
+        this.sheet = new CSSStyleSheet();
+        this.sheet.replaceSync(styles);
+    }
+    setAttribute(name, value) {this[name] = value}
+    getAttribute(name) {return this[name]}
+}
+class MathJaxStyleManager {
+    constructor() {
+        this.sheets = new Map();
+        this.roots = [document];
+    }
+    /**
+     * @param {StyleElement} style
+     */
+    add_sheet(style) {
+        this.sheets.set(style.id, style.sheet);
+        this.update();
+    }
+    /**
+     * @param {ShadowRoot|Document} root
+     */
+    register(root) {
+        this.roots.push(root);
+        this.update();
+    }
+
+    update() {
+        const SHEETS = Array.from(this.sheets.values());
+        document.adoptedStyleSheets = SHEETS;
+
+        for(let root of this.roots) {
+            root.adoptedStyleSheets = SHEETS;
+        }
+    }
+}
+MathJax = {
+    style_manager: new MathJaxStyleManager(),
+    tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        packages: {'[+]': ['numbas','texhtml']},
+        allowTexHTML: true
+    },
+    loader: {
+        load: ['[numbas]/numbas-mathjax.js?build_time=1781011434.604134', '[tex]/texhtml'],
+        paths: {numbas: './scripts/standalone_scripts'},
+        versionWarnings: false
+    },
+    startup: {
+        ready() {
+            /** 
+                Constructed stylesheet adaptor code by Davide Cervone, 2026.
+
+                To register an element's shadow root, call `MathJax.config.style_manager.register(element.shadowRoot)`.
+            */
+
+
+            /* Custom HTMLAdaptor to use constructed stylesheets instead of a `<style>` tags. */
+            const {HTMLAdaptor} = MathJax._.adaptors.HTMLAdaptor;
+            Object.assign(HTMLAdaptor.prototype, {
+                // Make node() create FakeStyleElement objects rather than HTMLStyleElement objects.
+                _node_: HTMLAdaptor.prototype.node,
+                node(kind, def = {}, children = [], ns) {
+                    if (kind === 'style' && def.id) return new FakeStyleElement(def, children[0]?.textContent ?? '');
+                    return this._node_(kind, def, children, ns);
+                },
+                // When a stylesheet is appended, add it to the style manager, which will update all registered roots to adopt it.
+                _append_: HTMLAdaptor.prototype.append,
+                append(node, child) {
+                    if (child instanceof FakeStyleElement) {
+                        MathJax.config.style_manager.add_sheet(child);
+                        return;
+                    }
+                    return this._append_(node, child);
+                },
+            });
+            // Modify AbstractRegion and LiveRegion to handle FakeStyleElement stylesheets
+            const {AbstractRegion, LiveRegion} = MathJax._.a11y.explorer.Region;
+            AbstractRegion.prototype.AddStyles = function () {
+                const adaptor = this.document.adaptor;
+                if (!this.CLASS.style || this.styleSheet) return;
+                const id = this.CLASS.sheetId;
+                const node = adaptor.node('style', {id}, [adaptor.text(this.CLASS.style.cssText)]);
+                this.CLASS._sheet = node;
+                adaptor.append(adaptor.head, node);
+            }
+            Object.defineProperty(LiveRegion, 'styleSheet', {get() {return this._sheet}});
+            // Handle the DraggableDialog stylesheet
+            const {DraggableDialog} = MathJax._.ui.dialog.DraggableDialog;
+            const {StyleJsonSheet} = MathJax._.util.StyleJson;
+            DraggableDialog.prototype.init = function (adaptor) {
+                const CLASS = this.constructor;
+                const {sheets} = MathJax.config.style_manager;
+                if (!sheets.has(CLASS.styleId)) {
+                    const style = adaptor.node(
+                        'style', { id: CLASS.styleId },
+                        [adaptor.text(new StyleJsonSheet(CLASS.styles).cssText)]
+                    );
+                    adaptor.append(adaptor.head(), style);
+                }
+            }
+
+            MathJax.startup.defaultReady();
+
+            // Grab the Menu stylesheet and recreate it as a FakeStyleElement object
+            // (we can't override the mj-context-menu methods, unfortunately).
+            const adaptor = MathJax.startup.adaptor;
+            const menu = document.head.querySelector('#MJX-Menu-styles');
+            const mstyle = adaptor.node('style', {id: menu.id}, [adaptor.text(menu.textContent)]);
+            menu.remove();
+            adaptor.append(adaptor.head(), mstyle);
+        }
+
+    }
+};
+</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-svg.js"></script>
+
+<!-- numbas stuff -->
+<script charset="UTF-8" type="text/javascript" src="numbas.js?build_time=1781011434.604134" charset="utf-8"></script>
+
+<script>
+    Numbas.queueScript('go',['start-exam'], function() {
+        Numbas.locale.set_preferred_locale('en-GB');
+    });
+    if(document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', Numbas.checkAllScriptsLoaded);
+    } else {
+        Numbas.checkAllScriptsLoaded();
+    }
+    Numbas.get_exam_init_data = function() {
+        return {
+            source: "// Numbas version: finer_feedback_settings\n{\"name\": \"Test_deg_selv_tallregning\", \"metadata\": {\"description\": \"\", \"licence\": \"None specified\"}, \"duration\": 0, \"percentPass\": 0, \"showQuestionGroupNames\": false, \"shuffleQuestionGroups\": false, \"showstudentname\": true, \"question_groups\": [{\"name\": \"Group\", \"pickingStrategy\": \"all-ordered\", \"pickQuestions\": 1, \"questionNames\": [\"\"], \"variable_overrides\": [[]], \"questions\": [{\"name\": \"Tall_testdegselv\", \"extensions\": [], \"custom_part_types\": [], \"resources\": [], \"navigation\": {\"allowregen\": true, \"showfrontpage\": false, \"preventleave\": false, \"typeendtoleave\": false}, \"contributors\": [{\"name\": \"Francesca Azzolini\", \"profile_url\": \"https://numbas.mathcentre.ac.uk/accounts/profile/19466/\"}], \"tags\": [], \"metadata\": {\"description\": \"\", \"licence\": \"None specified\"}, \"statement\": \"\", \"advice\": \"\u003cp\u003eHusk p\u0026aring; regnerekkef\u0026oslash;lgen:\u003c/p\u003e\\n\u003col\u003e\\n\u003cli\u003eParenteser\u003c/li\u003e\\n\u003cli\u003ePotenser\u003c/li\u003e\\n\u003cli\u003eMultiplikasjon og Divisjon\u003c/li\u003e\\n\u003cli\u003eAddisjon og Subtraksjon\u003c/li\u003e\\n\u003c/ol\u003e\\n\u003cp\u003eI tillegg m\u0026aring; vi huske \u0026aring; regne fra\u0026nbsp;\u003cstrong\u003evenstre til h\u0026oslash;yre\u003c/strong\u003e, spesielt n\u0026aring;r vi har flere operasjoner som gjennomf\u0026oslash;res sammtidig!\u003c/p\u003e\\n\u003cdiv data-jme-visible=\\\"cond_neg\\\"\u003e\\n\u003cp\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003eDersom vi skal plusse p\u0026aring; noe som er negativt, er det samme som \u0026aring; subtrahere med det samme tallet!\u003c/span\u003e\u003cbr/\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003eHusk:\u003c/span\u003e\u003c/p\u003e\\n\u003c/div\u003e\\n\u003cul\u003e\\n\u003cli\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003e++ blir +\u003c/span\u003e\u003c/li\u003e\\n\u003cli\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003e--\u0026nbsp; \u0026nbsp;blir +\u003c/span\u003e\u003c/li\u003e\\n\u003cli\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003e+-\u0026nbsp; blir -\u003c/span\u003e\u003c/li\u003e\\n\u003cli\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003e-+\u0026nbsp; blir -\u003c/span\u003e\u003cspan data-jme-visible=\\\"cond_neg23\\\"\u003e\u003c/span\u003e\u003c/li\u003e\\n\u003c/ul\u003e\\n\u003cp\u003e\u003cspan data-jme-visible=\\\"cond1\\\"\u003eHusk at $a^1=a$ (multiplisert med seg selv $1$ gang)\u003c/span\u003e\u003c/p\u003e\\n\u003cp\u003e\u003cspan data-jme-visible=\\\"cond0\\\"\u003eHusk at $a^0=1$ (multiplisert med seg selv $0$ ganger)\u0026nbsp;\u003c/span\u003e\u003c/p\u003e\", \"rulesets\": {}, \"builtin_constants\": {\"e\": true, \"pi,\\u03c0\": true, \"i\": true, \"j\": false}, \"constants\": [], \"variables\": {\"d22\": {\"name\": \"d22\", \"group\": \"Tall 2.2\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b23\": {\"name\": \"b23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c23\": {\"name\": \"c23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"d31\": {\"name\": \"d31\", \"group\": \"Tall 3.1\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"f31\": {\"name\": \"f31\", \"group\": \"Tall 3.1\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a32\": {\"name\": \"a32\", \"group\": \"Tall 3.2\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a31\": {\"name\": \"a31\", \"group\": \"Tall 3.1\", \"definition\": \"random(0..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b31\": {\"name\": \"b31\", \"group\": \"Tall 3.1\", \"definition\": \"if(a31\u003c=3,random(0..3),random(0,2))\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c22\": {\"name\": \"c22\", \"group\": \"Tall 2.2\", \"definition\": \"random(-5..5)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b22\": {\"name\": \"b22\", \"group\": \"Tall 2.2\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c32\": {\"name\": \"c32\", \"group\": \"Tall 3.2\", \"definition\": \"random(0..3)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"f32\": {\"name\": \"f32\", \"group\": \"Tall 3.2\", \"definition\": \"random(-5..5 except 0 except 1 except -1)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"d32\": {\"name\": \"d32\", \"group\": \"Tall 3.2\", \"definition\": \"random(-2..2 except 0 except 1)*f32\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"e32\": {\"name\": \"e32\", \"group\": \"Tall 3.2\", \"definition\": \"random(0..3 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a22\": {\"name\": \"a22\", \"group\": \"Tall 2.2\", \"definition\": \"random(-5..5 except 0)*b22\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"e22\": {\"name\": \"e22\", \"group\": \"Tall 2.2\", \"definition\": \"random(-5..5)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a21\": {\"name\": \"a21\", \"group\": \"2.1\", \"definition\": \"random(0..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b21\": {\"name\": \"b21\", \"group\": \"2.1\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c21\": {\"name\": \"c21\", \"group\": \"2.1\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"d21\": {\"name\": \"d21\", \"group\": \"2.1\", \"definition\": \"random(0..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"e21\": {\"name\": \"e21\", \"group\": \"2.1\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"f21\": {\"name\": \"f21\", \"group\": \"2.1\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a12\": {\"name\": \"a12\", \"group\": \"Tall 1.2\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b12\": {\"name\": \"b12\", \"group\": \"Tall 1.2\", \"definition\": \"random(4..7)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c12\": {\"name\": \"c12\", \"group\": \"Tall 1.2\", \"definition\": \"random(4..10)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a11\": {\"name\": \"a11\", \"group\": \"Tall 1.1\", \"definition\": \"random(0..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b11\": {\"name\": \"b11\", \"group\": \"Tall 1.1\", \"definition\": \"random(0..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c11\": {\"name\": \"c11\", \"group\": \"Tall 1.1\", \"definition\": \"random(0..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"c31\": {\"name\": \"c31\", \"group\": \"Tall 3.1\", \"definition\": \"random(-5..5)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"e31\": {\"name\": \"e31\", \"group\": \"Tall 3.1\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"b32\": {\"name\": \"b32\", \"group\": \"Tall 3.2\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"a23\": {\"name\": \"a23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"d23\": {\"name\": \"d23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-5..5 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"e23\": {\"name\": \"e23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"f23\": {\"name\": \"f23\", \"group\": \"Tall 2.3\", \"definition\": \"random(-10..10 except 0)\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond_neg\": {\"name\": \"cond_neg\", \"group\": \"Conditions\", \"definition\": \"b22\u003c0||d22\u003c0||e22\u003c0\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond_neg31\": {\"name\": \"cond_neg31\", \"group\": \"Conditions\", \"definition\": \"c31\u003c0||e31\u003c0||f31\u003c0\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond_neg3\": {\"name\": \"cond_neg3\", \"group\": \"Conditions\", \"definition\": \"d32\u003c0||f32\u003c0\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond_neg23\": {\"name\": \"cond_neg23\", \"group\": \"Conditions\", \"definition\": \"c23\u003c0||d23\u003c0||e23\u003c0\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond0\": {\"name\": \"cond0\", \"group\": \"Conditions\", \"definition\": \"b31=0||c32=0||e32=0\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}, \"cond1\": {\"name\": \"cond1\", \"group\": \"Conditions\", \"definition\": \"b31=1||c32=1||e32=1\", \"description\": \"\", \"templateType\": \"anything\", \"can_override\": false}}, \"variablesTest\": {\"condition\": \"\", \"maxRuns\": 100}, \"ungrouped_variables\": [], \"variable_groups\": [{\"name\": \"2.1\", \"variables\": [\"a21\", \"b21\", \"c21\", \"d21\", \"e21\", \"f21\"]}, {\"name\": \"Tall 1.2\", \"variables\": [\"a12\", \"b12\", \"c12\"]}, {\"name\": \"Tall 1.1\", \"variables\": [\"a11\", \"b11\", \"c11\"]}, {\"name\": \"Tall 2.2\", \"variables\": [\"a22\", \"b22\", \"c22\", \"d22\", \"e22\"]}, {\"name\": \"Tall 3.1\", \"variables\": [\"a31\", \"b31\", \"c31\", \"d31\", \"e31\", \"f31\"]}, {\"name\": \"Tall 3.2\", \"variables\": [\"a32\", \"b32\", \"c32\", \"d32\", \"e32\", \"f32\"]}, {\"name\": \"Tall 2.3\", \"variables\": [\"a23\", \"b23\", \"c23\", \"d23\", \"e23\", \"f23\"]}, {\"name\": \"Conditions\", \"variables\": [\"cond_neg\", \"cond_neg31\", \"cond_neg3\", \"cond_neg23\", \"cond0\", \"cond1\"]}], \"functions\": {}, \"preamble\": {\"js\": \"\", \"css\": \"\"}, \"parts\": [{\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"F\\u00f8rste sp\\u00f8rsm\\u00e5l tall\", \"marks\": \"56\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [{\"label\": \"Tall 3.1\", \"rawLabel\": \"Tall 3.1\", \"otherPart\": 2, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit=1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": true}, {\"label\": \"Tall 1.2\", \"rawLabel\": \"Tall 1.2\", \"otherPart\": 5, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit\u003c1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": false}], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp\u003eRegn ut\u0026nbsp; \u003c!--StartFragment --\u003e\u003cspan class=\\\"cf0\\\"\u003e$\\\\var{a22} \\\\div$ \u003cspan data-jme-visible=\\\"b22\u0026lt;0\\\"\u003e$($ \u003c/span\u003e$\\\\var{b22}$ \u003cspan data-jme-visible=\\\"b22\u0026lt;0\\\"\u003e$)$ \u003c/span\u003e$-$ \u003cspan data-jme-visible=\\\"c22\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{c22}$ \u003cspan data-jme-visible=\\\"c22\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$+$ \u003cspan data-jme-visible=\\\"d22\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{d22}$\u003cspan data-jme-visible=\\\"d22\u0026lt;0\\\"\u003e$)$\u003c/span\u003e $\\\\cdot$\u003c/span\u003e\u003cspan class=\\\"cf0\\\"\u003e\u0026nbsp;\u003cspan data-jme-visible=\\\"e22\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{e22}$\u003cspan data-jme-visible=\\\"e22\u0026lt;0\\\"\u003e$)$\u003c/span\u003e\u003c/span\u003e\u003c!--EndFragment --\u003e\u003c/p\u003e\", \"minValue\": \"a22/b22-c22+d22*e22\", \"maxValue\": \"a22/b22-c22+d22*e22\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 2.3\", \"marks\": \"14\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp style=\\\"padding-left: 40px;\\\"\u003eRegn ut $\\\\var{a23} \\\\cdot\\\\Bigl( \\\\var{b23}-$\u003cspan data-jme-visible=\\\"c23\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{c23}$\u003cspan data-jme-visible=\\\"c23\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\Bigr)+$\u003cspan data-jme-visible=\\\"d23\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{d23}$\u003cspan data-jme-visible=\\\"d23\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\cdot \\\\Bigl(\\\\var{e23}-$\u003cspan data-jme-visible=\\\"f23\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{f23}$\u003cspan data-jme-visible=\\\"f23\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\Bigr)$\u003c/p\u003e\", \"minValue\": \"a23*(b23-c23)+d23*(e23-f23)\", \"maxValue\": \"a23*(b23-c23)+d23*(e23-f23)\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 3.1\", \"marks\": \"29\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [{\"label\": \"Tall 3.2\", \"rawLabel\": \"Tall 3.2\", \"otherPart\": 3, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit=1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": true}, {\"label\": \"Tall 2.3\", \"rawLabel\": \"Tall 2.3\", \"otherPart\": 1, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit\u003c1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": true}], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp style=\\\"padding-left: 40px;\\\"\u003eRegn ut\u0026nbsp; $\\\\var{a31}^\\\\var{b31}-$\u003cspan data-jme-visible=\\\"c31\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{c31}$\u003cspan data-jme-visible=\\\"c31\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\cdot\\\\Bigl(\\\\var{d31}+$\u003cspan data-jme-visible=\\\"e31\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{e31}$\u003cspan data-jme-visible=\\\"e31\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\Bigr)+$\u003cspan data-jme-visible=\\\"f31\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{f31}$\u003cspan data-jme-visible=\\\"f31\u0026lt;0\\\"\u003e$)$\u003c/span\u003e\u003c/p\u003e\", \"minValue\": \"a31^b31-c31*(d31+e31)+f31\", \"maxValue\": \"a31^b31-c31*(d31+e31)+f31\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 3.2\", \"marks\": \"15\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp\u003eRegn ut $\\\\var{a32}\\\\cdot\\\\Bigl( $\u003cspan data-jme-visible=\\\"b32\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{b32}$\u003cspan data-jme-visible=\\\"b32\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$^\\\\var{c32}-$\u003cspan data-jme-visible=\\\"d32\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{d32}$\u003cspan data-jme-visible=\\\"d32\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$^\\\\var{e32}\\\\div$\u003cspan data-jme-visible=\\\"f32\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{f32}$\u003cspan data-jme-visible=\\\"f32\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$ \\\\Bigr)$\u003c/p\u003e\", \"minValue\": \"a32*(b32^c32-(d32^e32/f32))\", \"maxValue\": \"a32*(b32^c32-(d32^e32/f32))\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 2.1\", \"marks\": \"14\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp\u003eRegn ut\u0026nbsp;\u003c/p\u003e\\n\u003cp\u003e$\\\\var{a21} \\\\cdot\\\\Bigl( \\\\var{b21}-$\u003cspan data-jme-visible=\\\"c21\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{c21}$\u003cspan data-jme-visible=\\\"c21\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\Bigr)+$\u003cspan data-jme-visible=\\\"d21\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{d21}$\u003cspan data-jme-visible=\\\"d21\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\cdot \\\\Bigl(\\\\var{e21}-$\u003cspan data-jme-visible=\\\"f21\u0026lt;0\\\"\u003e$($\u003c/span\u003e$\\\\var{f21}$\u003cspan data-jme-visible=\\\"f21\u0026lt;0\\\"\u003e$)$\u003c/span\u003e$\\\\Bigr)$\u003c/p\u003e\", \"minValue\": \"a21*(b21-c21)+d21*(e21-f21)\", \"maxValue\": \"a21*(b21-c21)+d21*(e21-f21)\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 1.2\", \"marks\": \"28\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [{\"label\": \"Tall 2.1\", \"rawLabel\": \"Tall 2.1\", \"otherPart\": 4, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit=1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": true}, {\"label\": \"Tall 1.1\", \"rawLabel\": \"Tall 1.1\", \"otherPart\": 6, \"variableReplacements\": [], \"availabilityCondition\": \"answered and credit\u003c1\", \"penalty\": \"\", \"penaltyAmount\": 0, \"showPenaltyHint\": true, \"lockAfterLeaving\": true}], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp\u003eRegn ut\u0026nbsp;$ \\\\var{a12} - \\\\var{b12}\u0026nbsp;\\\\cdot \\\\var{c12}\u0026nbsp;$\u003c/p\u003e\", \"minValue\": \"a12-b12*c12\", \"maxValue\": \"a12-b12*c12\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}, {\"type\": \"numberentry\", \"useCustomName\": true, \"customName\": \"Tall 1.1\", \"marks\": \"14\", \"scripts\": {}, \"customMarkingAlgorithm\": \"\", \"extendBaseMarkingAlgorithm\": true, \"unitTests\": [], \"showCorrectAnswer\": true, \"showFeedbackIcon\": true, \"variableReplacements\": [], \"variableReplacementStrategy\": \"originalfirst\", \"nextParts\": [], \"suggestGoingBack\": false, \"adaptiveMarkingPenalty\": 0, \"exploreObjective\": \"Tall\", \"prompt\": \"\u003cp\u003eRegn ut $\\\\var{a11}\\\\cdot \\\\var{b11}+\\\\var{c11}$\u003c/p\u003e\", \"minValue\": \"a11*b11+c11\", \"maxValue\": \"a11*b11+c11\", \"correctAnswerFraction\": false, \"allowFractions\": false, \"mustBeReduced\": false, \"mustBeReducedPC\": 0, \"displayAnswer\": \"\", \"showFractionHint\": true, \"notationStyles\": [\"plain\", \"en\", \"si-en\"], \"correctAnswerStyle\": \"plain\"}], \"partsMode\": \"explore\", \"maxMarks\": \"100\", \"objectives\": [{\"name\": \"Tall\", \"limit\": \"100\"}], \"penalties\": [], \"objectiveVisibility\": \"always\", \"penaltyVisibility\": \"always\"}]}], \"allowPrinting\": true, \"navigation\": {\"allowregen\": true, \"reverse\": true, \"browse\": true, \"allowsteps\": true, \"showfrontpage\": true, \"navigatemode\": \"sequence\", \"onleave\": {\"action\": \"none\", \"message\": \"\"}, \"preventleave\": true, \"typeendtoleave\": false, \"startpassword\": \"\", \"autoSubmit\": true, \"allowAttemptDownload\": false, \"downloadEncryptionKey\": \"\", \"showresultspage\": \"oncompletion\"}, \"timing\": {\"allowPause\": true, \"timeout\": {\"action\": \"none\", \"message\": \"\"}, \"timedwarning\": {\"action\": \"none\", \"message\": \"\"}}, \"feedback\": {\"enterreviewmodeimmediately\": true, \"showactualmarkwhen\": \"always\", \"showtotalmarkwhen\": \"always\", \"showanswerstatewhen\": \"always\", \"showpartfeedbackmessageswhen\": \"always\", \"showexpectedanswerswhen\": \"inreview\", \"showadvicewhen\": \"inreview\", \"allowrevealanswer\": true, \"intro\": \"\", \"end_message\": \"\", \"results_options\": {\"printquestions\": true, \"printadvice\": true}, \"feedbackmessages\": [], \"reviewshowexpectedanswer\": true, \"showanswerstate\": true, \"reviewshowfeedback\": true, \"showactualmark\": true, \"showtotalmark\": true, \"reviewshowscore\": true, \"reviewshowadvice\": true}, \"diagnostic\": {\"knowledge_graph\": {\"topics\": [], \"learning_objectives\": []}, \"script\": \"diagnosys\", \"customScript\": \"\"}, \"contributors\": [{\"name\": \"Francesca Azzolini\", \"profile_url\": \"https://numbas.mathcentre.ac.uk/accounts/profile/19466/\"}], \"extensions\": [], \"custom_part_types\": [], \"resources\": []}",
+            extension_data: "{}"
+        }
+    }
+</script>
+
+
+
+	</head>
+	
+    <body>
+        <template id="numbas-exam-template">
+    
+    <style id="numbas-style">@import 'numbas.css?build_time=1781011434.604134';</style>
+    
+    <exam-container class="numbas-container" data-bind="with: exam, css: css, attr: attr">
+        <div id="loading">
+    <img class="logo center-block" src="resources/numbas-logo.svg" alt="Numbas"/>
+    <progress min="0" max="100" value="0"></progress>
+    <span class="loading-text" data-localise="page.loading">Loading...</span>
+</div>
+        <!-- modal dialog boxes -->
+<dialog id="saving" data-bind="modal: saving">
+    <div class="text" data-localise="page.saving"></div>
+</dialog>
+<dialog class="modal" id="alert-modal" aria-labelledby="alert-modal-title" aria-describedby="alert-modal-body" data-bind="modal: {submit: $root.modal.ok}">
+    <section>
+        <header>
+            <h2 id="alert-modal-title" data-localise="modal.alert"></h2>
+        </header>
+
+        <div class="modal-body" id="alert-modal-body"></div>
+
+        <footer>
+            <form method="dialog">
+                <button value="ok" autofocus class="ok btn primary" data-localise="modal.ok"></button>
+            </form>
+        </footer>
+    </section>
+</dialog>
+
+<dialog class="modal" id="confirm-modal" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-body" data-bind="modal: {submit: $root.modal.ok, cancel: $root.modal.cancel}">
+    <section>
+        <header>
+            <h2 id="confirm-modal-title" data-localise="modal.confirm"></h2>
+        </header>
+        <div class="modal-body" id="confirm-modal-body">
+        </div>
+        <footer>
+            <form method="dialog">
+                <button autofocus class="cancel btn" value="cancel" data-localise="modal.cancel"></button>
+                <button value="ok" class="ok btn primary" data-localise="modal.ok"></button>
+            </form>
+        </footer>
+    </section>
+</dialog>
+<dialog class="modal" id="confirm-end-exam-modal" aria-labelledby="confirm-end-exam-modal-title" aria-describedby="confirm-end-exam-modal-body" data-bind="modal: {submit: $root.modal.ok, cancel: $root.modal.cancel}">
+    <form method="dialog">
+        <header>
+            <h4 id="confirm-end-exam-modal-title" data-localise="modal.confirm"></h4>
+        </header>
+        <div class="modal-body" id="confirm-end-exam-modal-body" data-bind="with: $root.exam">
+            <p id="confirm-end-exam-modal-message"></p>
+            <form class="form-inline" data-bind="submit: $root.modal.ok">
+                <label for="confirm-end-text-input" id="confirm-end-exam-modal-input-message"></label>
+                <input autofocus id="confirm-end-text-input" type="text" data-bind="textInput: confirmEndHandler.value, autosize: confirmEndHandler.value">
+                <span class="password-feedback feedback-icon" data-bind="css: confirmEndHandler.feedback().iconClass, attr: {title: confirmEndHandler.feedback().title}"></span>
+            </form>
+        </div>
+        <footer>
+            <button value="cancel" class="cancel btn" data-localise="modal.cancel"></button>
+            <button value="ok" class="ok btn primary" data-bind="disable: !confirmEndHandler.valid(), css: confirmEndHandler.feedback().buttonClass" data-localise="modal.end exam button"></button>
+        </footer>
+    </form>
+</dialog>
+<dialog class="modal force-default-style" id="style-modal" aria-labelledby="style-modal-title" aria-describedby="style-modal-explanation" data-bind="with: $root.style_customiser, modal: {submit: $root.saveStyle}">
+    <form method="dialog">
+        <header>
+            <h4 id="style-modal-title" data-localise="control.style options"></h4>
+        </header>
+
+        
+        <p class="help-block" id="style-modal-explanation" data-localise="modal.style.explanation"></p>
+
+        <p class="help-block warning" data-bind="visible: forced_colors" data-localise="modal.forced colours warning"></p>
+
+        
+        <section class="style-controls">
+            <fieldset>
+                <label for="main-font-picker" data-localise="modal.style.main font"></label>
+                <select id="main-font-picker" data-bind="value: staged_style['--main-font'], options: font_options, optionsText: 'label', optionsValue: 'name'">
+                </select>
+            </fieldset>
+            <fieldset>
+                <label for="text-size-picker" data-localise="modal.style.text size"></label>
+                <input id="text-size-picker" type="number" step="0.1" min="0.5" max="4" data-bind="value: staged_style['--text-size']">
+                <output id="text-size-preview" class="big" data-localise="modal.style.text preview"></output>
+            </fieldset>
+            <fieldset>
+                <label for="font-weight-picker" data-localise="modal.style.font weight"></label>
+                <input id="font-weight-picker" type="range" step="100" min="200" max="800" data-bind="value: staged_style['--font-weight'], valueUpdate: 'input'">
+                <output id="font-weight-preview" data-bind="text: staged_style['--font-weight']"></output>
+            </fieldset>
+            <fieldset>
+                <label for="spacing-picker" data-localise="modal.style.spacing"></label>
+                <input id="spacing-picker" type="range" step="0.1" min="0.1" max="3" data-bind="value: staged_style['--spacing-scale'], valueUpdate: 'input'">
+                <output id="spacing-preview" data-bind="percentage: parseFloat(staged_style['--spacing-scale']())"></output>
+            </fieldset>
+            <fieldset>
+                <label for="color-scheme-picker" data-localise="modal.style.colour scheme"></label>
+                <select id="color-scheme-picker" data-bind="value: color_scheme">
+                    <option value="automatic" data-localise="modal.style.automatic colour scheme"></option>
+                    <option value="light" data-localise="modal.style.light colour scheme"></option>
+                    <option value="dark" data-localise="modal.style.dark colour scheme"></option>
+                    <option value="custom" data-localise="modal.style.custom colour scheme"></option>
+                </select>
+            </fieldset>
+            <fieldset>
+                <label for="invert-images" data-localise="modal.style.invert images in dark mode"></label>
+                <input id="invert-images" type="checkbox" data-bind="checked: invert_images">
+            </fieldset>
+        </section>
+
+        <section class="style-controls" data-bind="visible: using_custom_color_scheme">
+            <fieldset>
+                <label for="background-colour-picker" data-localise="modal.style.background colour"></label>
+                <input id="background-colour-picker" type="color" data-bind="value: style['--custom-background-color']">
+            </fieldset>
+            <fieldset>
+                <label for="text-colour-picker" data-localise="modal.style.text colour"></label>
+                <input id="text-colour-picker" type="color" data-bind="value: style['--custom-text-color']">
+            </fieldset>
+            <fieldset>
+                <label for="main-colour-picker" data-localise="modal.style.main colour"></label>
+                <input id="main-colour-picker" type="color" data-bind="value: style['--custom-main-color']">
+            </fieldset>
+            <fieldset>
+                <label for="primary-colour-picker" data-localise="modal.style.primary colour"></label>
+                <input id="primary-colour-picker" type="color" data-bind="value: style['--custom-primary-color']">
+            </fieldset>
+            <fieldset>
+                <label for="link-colour-picker" data-localise="modal.style.link colour"></label>
+                <input id="link-colour-picker" type="color" data-bind="value: style['--custom-link-color']">
+            </fieldset>
+            <fieldset>
+                <label for="success-colour-picker" data-localise="modal.style.success colour"></label>
+                <input id="success-colour-picker" type="color" data-bind="value: style['--custom-success-color']">
+            </fieldset>
+            <fieldset>
+                <label for="info-colour-picker" data-localise="modal.style.info colour"></label>
+                <input id="info-colour-picker" type="color" data-bind="value: style['--custom-info-color']">
+            </fieldset>
+            <fieldset>
+                <label for="warning-colour-picker" data-localise="modal.style.warning colour"></label>
+                <input id="warning-colour-picker" type="color" data-bind="value: style['--custom-warning-color']">
+            </fieldset>
+            <fieldset>
+                <label for="danger-colour-picker" data-localise="modal.style.danger colour"></label>
+                <input id="danger-colour-picker" type="color" data-bind="value: style['--custom-danger-color']">
+            </fieldset>
+            <fieldset>
+                <label for="muted-colour-picker" data-localise="modal.style.muted colour"></label>
+                <input id="muted-colour-picker" type="color" data-bind="value: style['--custom-muted-color']">
+            </fieldset>
+            <fieldset>
+                <label for="highlight-colour-picker" data-localise="modal.style.highlight colour"></label>
+                <input id="highlight-colour-picker" type="color" data-bind="value: style['--custom-highlight-color']">
+            </fieldset>
+        </section>
+
+        
+
+        
+
+        
+        <hr/>
+        <p class="help-block"><a href="https://docs.numbas.org.uk/en/latest/accessibility/exam.html" target="_blank" data-localise="accessibility statement"></a></p>
+        
+
+        <footer>
+            <button type="button" class="btn danger sm" data-localise="modal.style.reset to defaults" data-bind="click: reset"></button>
+            <button class="cancel btn" value="cancel" autofocus data-localise="modal.cancel"></button>
+            <button value="ok" class="ok btn primary" data-localise="modal.ok"></button>
+        </footer>
+    </form>
+</dialog>
+<dialog class="modal" id="next-actions-modal" aria-labelledby="next-actions-modal-title">
+    <form method="dialog" data-bind="with: diagnostic_next_actions">
+        <header>
+            <h4 id="next-actions-modal-title" data-localise="diagnostic.make a choice"></h4>
+        </header>
+        <div data-bind="latex: feedback"></div>
+
+        <menu data-bind="foreach: actions" class="list-unstyled actions">
+            <li>
+                <button type="button" data-bind="click: go"><span data-bind="latex: label"></span></button>
+            </li>
+        </menu>
+    </form>
+</dialog>
+
+<dialog id="lightbox"></dialog>
+        <div id="everything">
+            <a class="sr-only" id="skip-link" data-bind="attr: {href: infoPage() ? '#infoDisplay' : '#questionContainer'}" data-localise="page.skip to content"></a>
+            <!-- ko if: exam.settings.navigateMode=='sequence' -->
+    <!-- side menu, slides out on narrow screens -->
+<nav id="sideNav">
+
+    <header>
+        <img class="logo center-block" src="resources/numbas-logo.svg" alt="Numbas"/>
+
+        <h1 class="exam-name" data-bind="text: exam.settings.name, typeset: exam.settings.name"></h1>
+
+        <button type="button" class="navbar-toggle btn" aria-controls="navMenu">
+            <svg viewBox="0 0 9 9">
+    <title data-localise="control.toggle navigation menu"></title>
+    <line x1="1" y1="1" x2="8" y2="8" stroke="currentColor"/>
+    <line x1="1" y1="8" x2="8" y2="1" stroke="currentColor"/>
+</svg>
+        </button>
+    </header>
+
+    <!-- ko if: numQuestions() > 1 -->
+    <label class="sr-only" for="exam-progress" data-localise="exam.progress"></label>
+    <progress id="exam-progress" data-bind="attr: {max: numQuestions(), value: questionsAttempted(), title: questionsAttemptedDisplay}, text: questionsAttemptedDisplay"></progress>
+    <!-- /ko -->
+
+    <menu id="questionList" class="nav navmenu-nav" role="tablist" aria-orientation="vertical" data-bind="tablist: true">
+        <li class="introduction" data-bind="visible: exam.hasIntro, css: {active: $root.exam().infoPage()=='introduction'}">
+            <a href="#" role="tab" data-bind="click: () => showInfoPage('introduction'), attr: {'aria-current': $root.exam().infoPage()=='introduction' ? 'step' : false, tabindex: $root.exam().infoPage()=='introduction' ? 0 : -1, 'data-name': R('control.show introduction')}" data-localise="control.show introduction"></a>
+       </li>
+        <!-- ko foreach: question_groups -->
+            <!-- ko if: $root.exam().showQuestionGroupNames -->
+            <li class="question-group-header" data-bind="visible: show_name">
+                <h2 data-bind="text: name, typeset: name"></h2>
+                <span class="score" data-bind="html: feedback.message"></span>
+            </li>
+            <!-- /ko -->
+            <!-- ko foreach: questions -->
+            <li class="questionSelector" data-bind="visible: visible, css: {active: $root.exam().currentQuestion()==$data}">
+                <a href="#" role="tab" data-bind="click: Numbas.controls.makeQuestionJumper(question.number, question.exam), attr: {'aria-current': isCurrentQuestion() ? 'step' : false, tabindex: isCurrentQuestion() ? 0 : -1, 'data-number': question.number+1, 'data-name': displayName}">
+                    <div class="question-info">
+                        <span class="feedback-icon" data-bind="css: scoreFeedback.iconClass, attr: scoreFeedback.iconAttr" aria-hidden="true"></span>
+                        <span class="name" data-bind="text: displayName"></span>
+                        <span class="sr-only" data-bind="text: scoreFeedback.iconAttr().title"></span>
+                        <span class="score" data-bind="html: scoreFeedback.message"></span>
+                    </div>
+                    <div class="messages">
+                        <div class="answered-state" data-bind="">
+                            <span data-bind="text: scoreFeedback.answeredString"></span>
+                        </div>
+                        <div data-bind="visible: isDirty" class="dirty-message">
+                            <span class="warning-icon icon-exclamation-sign"></span>
+                            <span data-localise="question.selector.unsubmitted changes"></span>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            <!-- /ko -->
+        <!-- /ko -->
+        <!-- total exam score display -->
+        <li class="examScore" data-bind="visible: showActualMark">
+            <span data-localise="control.total"></span> 
+            <span id="examScore" data-bind="html: examScoreDisplay"></span>
+        </li>
+    </menu>
+
+    <div class="stopWatch" data-bind="visible: showTime">
+    <span class="" data-localise="timing.time remaining"></span>
+    <time class="time" data-bind="duration: timeRemaining"></time>
+</div>
+
+    <menu class="nav navmenu-nav menuButtons">
+        <li><button class="btn center-block thin-button display-options force-original-color" type="button" data-bind="click: $root.showStyleModal" data-localise="control.style options"></button></li>
+        <li data-bind="visible: allowPause && mode()=='normal'"><button class="btn center-block thin-button" id="pauseBtn" data-localise="control.pause" data-bind="click: pause"></button></li>
+        <li data-bind="visible: mode()=='normal'"><button class="btn danger center-block" id="endBtn" data-localise="control.end exam" data-bind="click: endExam"></button></li>
+        <li data-bind="visible: mode()=='review'"><button class="btn center-block" data-localise="control.back to results" data-bind="click: () => showInfoPage('result')"></button></li>
+    </menu>
+
+</nav>
+
+<!-- top menu shown on narrow screens -->
+<nav id="topNav" class="navbar">
+    <!-- ko if: numQuestions() > 1 -->
+    <div class="prev"><button type="button" class="btn" data-bind="click: reverse, attr: {disabled: !canReverse()}"><span class="sr-only" data-localise="control.previous"></span>&larr;</button></div>
+    <div class="next"><button type="button" class="btn" data-bind="click: advance, attr: {disabled: !canAdvance()}"><span class="sr-only" data-localise="control.next"></span>&rarr;</span></button></div>
+    <!-- /ko -->
+    <div class="end"><button class="btn danger" data-localise="control.end exam" data-bind="click: endExam, visible: mode()=='normal' && !canAdvance()"></button></div>
+    <div class="titleBits" data-bind="with: currentQuestion">
+        <span class="review-header" data-bind="visible: $root.exam().mode()=='review'" data-localise="exam.review header"></span>
+        <span id="questionNameDisplay" data-bind="text: displayName"></span>
+    </div>
+
+    <div class="stopWatch" data-bind="visible: showTime">
+    <span class="" data-localise="timing.time remaining"></span>
+    <time class="time" data-bind="duration: timeRemaining"></time>
+</div>
+
+    <button type="button" class="navbar-toggle btn" aria-controls="navMenu">
+        <svg viewBox="0 0 9 9">
+    <title data-localise="control.toggle navigation menu"></title>
+    <rect x="0" y="0" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="8" width="9" height="1" fill="currentColor"/>
+</svg>
+    </button>
+</nav>
+<!-- /ko -->
+
+<!-- ko if: exam.settings.navigateMode=='menu' -->
+    <nav id="topNav" class="navbar">
+    <button type="button" class="btn primary" data-bind="visible: mode()=='normal', click: showMenu">&larr; <span data-localise="control.back to menu"></span></button>
+    <button type="button" class="btn primary" data-bind="visible: mode()=='review', click: () => showInfoPage('result')">&larr; <span data-localise="control.back to results"></span></button>
+    <div class="titleBits" data-bind="with: currentQuestion">
+        <span class="review-header" data-bind="visible: $root.exam().mode()=='review'" data-localise="exam.review header"></span>
+        <span id="questionNameDisplay" data-bind="latex: displayName"></span>
+    </div>
+    <button class="btn thin-button display-options force-original-color" type="button" data-bind="click: $root.showStyleModal" data-localise="control.style options"></button>
+</nav>
+<!-- /ko -->
+
+<!-- ko if: exam.settings.navigateMode=='diagnostic' -->
+    <!-- side menu, slides out on narrow screens -->
+<nav id="sideNav">
+
+    <header>
+        <div class="navmenu-brand">
+            <img class="logo center-block" src="resources/numbas-logo.svg" alt="Numbas"/>
+        </div>
+        <h1 class="exam-name navmenu-brand" data-bind="text: exam.settings.name, typeset: exam.settings.name"></h1>
+        <button type="button" class="navbar-toggle btn" aria-controls="navMenu">
+            <svg viewBox="0 0 9 9">
+    <title data-localise="control.toggle navigation menu"></title>
+    <line x1="1" y1="1" x2="8" y2="8" stroke="currentColor"/>
+    <line x1="1" y1="8" x2="8" y2="1" stroke="currentColor"/>
+</svg>
+        </button>
+    </header>
+
+    <dl id="learning-objective-list" class="nav navemnu-nav">
+        <!-- ko foreach: diagnostic_progress -->
+        <dt class="name" data-bind="latex: name"></dt>
+        <dd data-bind="text: Math.floor(100*progress)+'%'"></dd>
+        <!-- /ko -->
+    </dl>
+
+
+    <div class="stopWatch" data-bind="visible: showTime">
+    <span class="" data-localise="timing.time remaining"></span>
+    <time class="time" data-bind="duration: timeRemaining"></time>
+</div>
+
+    <menu class="nav navmenu-nav menuButtons">
+        <li><button class="btn center-block thin-button display-options force-original-color" type="button" data-bind="click: $root.showStyleModal" data-localise="control.style options"></button></li>
+        <li data-bind="visible: allowPause && mode()=='normal'"><button class="btn center-block thin-button" id="pauseBtn" data-localise="control.pause" data-bind="click: pause"></button></li>
+        <li data-bind="visible: mode()=='normal'"><button class="btn danger center-block" id="endBtn" data-localise="control.end exam" data-bind="click: endExam"></button></li>
+        <li data-bind="visible: mode()=='review'"><button class="btn center-block" data-localise="control.back to results" data-bind="click: () => showInfoPage('result')"></button></li>
+    </menu>
+
+</nav>
+
+<!-- top menu shown on narrow screens -->
+<nav id="topNav" class="navbar">
+    <div class="nav">
+        <div class="titleBits" data-bind="with: currentQuestion">
+            <span class="review-header" data-bind="visible: $root.exam().mode()=='review'" data-localise="exam.review header"></span>
+            <span id="questionNameDisplay" data-bind="text: displayName"></span>
+        </div>
+
+        <div class="stopWatch" data-bind="visible: showTime">
+    <span class="" data-localise="timing.time remaining"></span>
+    <time class="time" data-bind="duration: timeRemaining"></time>
+</div>
+    </div>
+
+    <button type="button" class="navbar-toggle btn" aria-controls="navMenu">
+        <svg viewBox="0 0 9 9">
+    <title data-localise="control.toggle navigation menu"></title>
+    <rect x="0" y="0" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="8" width="9" height="1" fill="currentColor"/>
+</svg>
+    </button>
+</nav>
+<!-- /ko -->
+
+            <!-- main content area - info pages or questions go in here -->
+            <main class="mainDisplay" role="main" data-bind="attr: {'aria-labelledby': main_labelledby}">
+                <div id="infoDisplay" class="main-content" data-bind="visible: infoPage">
+    <div id="frontpage" data-bind="visible: infoPage()=='frontpage', if: infoPage()=='frontpage'">
+        <h1 class="break-words" id="infopage-frontpage-header" data-bind="html: exam.settings.name"></h1>
+<table class="summary">
+    <tbody>
+    <!-- ko if: exam.settings.navigateMode != 'diagnostic' -->
+    <tr>
+        <th data-localise="exam.number of questions"></th>
+        <td class="rtd" data-bind="html: numAssessedQuestions"></td>
+    </tr>
+    <tr data-bind="visible: exam.settings.showTotalMark">
+        <th data-localise="exam.marks available"></th>
+        <td class="rtd" data-bind="niceNumber: marks"></td>
+    </tr>
+    <!-- /ko -->
+    <tr data-bind="visible: exam.settings.percentPass>0">
+        <th data-localise="exam.pass percentage"></th>
+        <td class="rtd" data-bind="text: percentPass"></td>
+    </tr>
+    <tr data-bind="visible: duration()>0">
+        <th data-localise="exam.time allowed"></th>
+        <td class="rtd"><time data-bind="duration: duration"></time></td>
+    </tr>
+    <tr data-bind="visible: exam.settings.showStudentName && exam.student_name && !needsStudentName">
+        <th data-localise="exam.student name"></th>
+        <td><span data-bind="text: exam.student_name"></span><span data-bind="visible: exam.student_id"> (<span data-bind="text: exam.student_id"></span>)</span></td>
+    </tr>
+    </tbody>
+</table>
+
+<div id="intro" data-bind="visible: exam.hasIntro, latex: exam.introMessage" localise-data-jme-context-description="exam.introduction"></div>
+
+<div class="alert danger" data-bind="visible: showAttemptDownloadSecurityWarning">
+    <p data-localise="exam.attempt download security warning"></p>
+</div>
+<div id="standalone-warning" class="alert info" data-bind="visible: !Numbas.storage.lmsConnected && !allowAttemptDownload" data-localise="frontpage.scorm.lms not connected"></div>
+
+<form data-bind="submit: beginExam" class="info-buttons">
+    <button class="btn display-options force-original-color" type="button" data-bind="click: $root.showStyleModal" data-localise="control.style options"></button>
+    <div class="student-name" data-bind="visible: needsStudentName">
+        <label for="begin-exam-student-name" data-localise="exam.enter your name"></label>
+        <input id="begin-exam-student-name" name="begin-exam-student-name" type="text" data-bind="textInput: student_name, autosize: student_name"/>
+    </div>
+    <div class="password" data-bind="visible: needsPassword">
+        <label for="begin-exam-password" data-localise="exam.enter password"></label>
+        <input id="begin-exam-password" autocomplete="off" name="begin-exam-password" type="text" data-bind="textInput: passwordHandler.value, autosize: passwordHandler.value, css: {'has-errors': passwordHandler.value().length && !passwordHandler.valid(), 'success': passwordHandler.valid()}"/>
+        <span class="password-feedback feedback-icon" data-bind="css: passwordHandler.feedback().iconClass, attr: {title: passwordHandler.feedback().title}"></span>
+    </div>
+    <button class="btn" id="startBtn" type="submit" data-bind="disable: !canBegin(), css: passwordHandler.feedback().buttonClass" data-localise="frontpage.start"></button>
+</form>
+    </div>
+    <div id="menu" data-bind="visible: infoPage()=='menu', if: infoPage()=='menu'">
+        <h1 id="infopage-menu-header" class="break-words" data-bind="html: exam.settings.name"></h1>
+
+<div class="intro" class="alert" data-bind="visible: exam.hasIntro, latex: exam.introMessage" localise-data-jme-context-description="exam.introduction"></div>
+
+<nav id="question-chooser">
+    <table class="table questionSelector">
+        <colgroup>
+            <col class="question">
+            <col class="score">
+            <col class="icon">
+        </colgroup>
+        <tbody>
+        <!-- ko foreach: question_groups -->
+            <!-- ko if: $parent.showQuestionGroupNames -->
+            <tr>
+                <th data-bind="visible: $parent.question_groups.length>1">
+                    <span data-bind="latex: name"></span>
+                </th>
+                <th class="messages">
+                    <span class="score" data-bind="html: feedback.plainMessage"></span>
+                </th>
+                <th class="icon">
+                    <span class="feedback-icon" data-bind="css: feedback.iconClass, attr: feedback.iconAttr" aria-hidden="true"></span>
+                </th>
+            </tr>
+            <!-- /ko -->
+            <!-- ko foreach: questions -->
+            <tr class="" role="button" data-bind="click: Numbas.controls.makeQuestionJumper(question.number, question.exam), attr: {'aria-labelledby': question.path+'-menu-name'}">
+                <td class="info">
+                    <button class="btn link" type="button" class="name" data-bind="latex: displayName, attr: {id: question.path+'-menu-name'}"></button>
+                </td>
+                <td class="messages">
+                    <span class="sr-only" data-bind="text: scoreFeedback.iconAttr().title"></span>
+                    <span class="score" data-bind="html: scoreFeedback.plainMessage"></span>
+                    <div class="answered-state" data-bind="">
+                        <span data-bind="text: scoreFeedback.attemptedString"></span>
+                    </div>
+                    <div data-bind="visible: isDirty" class="dirty-message">
+                        <span class="warning-icon icon-exclamation-sign"></span>
+                        <span data-localise="question.selector.unsubmitted changes"></span>
+                    </div>
+                </td>
+                <td class="icon">
+                    <span class="feedback-icon" data-bind="css: scoreFeedback.iconClass, attr: scoreFeedback.iconAttr" aria-hidden="true"></span>
+                </td>
+            </tr>
+            <!-- /ko -->
+        <!-- /ko -->
+        </tbody>
+    </table>
+</nav>
+
+<menu class="nav navmenu-nav menuButtons">
+    <li><button class="btn thin-button" type="button" data-bind="click: $root.showStyleModal" data-localise="control.style options"></button></li>
+    <li><button class="btn danger thin-button" id="endBtn" data-localise="control.end exam" data-bind="click: endExam"></button></li>
+</menu>
+    </div>
+    <div id="introduction" data-bind="visible: infoPage()=='introduction', if: infoPage()=='introduction'">
+        <h1 id="infopage-introduction-header" data-localise="exam.introduction"></h1>
+<div data-bind="latex: exam.introMessage" localise-data-jme-context-description="exam.introduction"></div>
+    </div>
+    <div id="suspend" data-bind="visible: infoPage()=='paused' || infoPage()=='resumed', if: infoPage()=='paused' || infoPage()=='resumed'">
+        <h1 id="infopage-suspend-header">
+    <span data-bind="visible: infoPage()=='paused'" data-localise="suspend.paused header" ></span>
+    <span data-bind="visible: infoPage()=='resumed'" data-localise="suspend.resumed header" ></span>
+</h1>
+<p data-localise="suspend.exam suspended"></p>
+<p data-localise="suspend.you can resume"></p>
+<button class="btn primary" id="resumeBtn" data-bind="click: resumeExam" data-localise="suspend.resume"></button>
+    </div>
+    <div id="results" data-bind="visible: infoPage()=='result', if: infoPage()=='result'">
+        <header>
+    <h1 class="exam-name text-center break-words" data-bind="latex: exam.settings.name"></h1>
+</header>
+
+<!-- ko if: exam.settings.navigateMode=='diagnostic' -->
+    <table id="diagnostic-breakdown">
+    <colgroup>
+        <col>
+        <col>
+    </colgroup>
+    <thead>
+        <th data-localise="result.learning objective"></th>
+        <!-- ko if: showActualMark -->
+        <th data-localise="result.question score"></th>
+        <!-- /ko -->
+    </thead>
+    <tbody>
+        <!-- ko foreach: diagnostic_progress -->
+            <tr data-bind="css: {total: $index()==$parent.diagnostic_progress().length-1}">
+                <td class="name" data-bind="latex: name"></td>
+                <!-- ko if: $parent.showActualMark -->
+                <td class="score" data-bind="text: Math.floor(100*credit)+'%'"></td>
+                <!-- /ko -->
+            </tr>
+        <!-- /ko -->
+    </tbody>
+</table>
+<!-- /ko -->
+
+<!-- ko if: exam.settings.navigateMode=='sequence' || exam.settings.navigateMode=='menu' -->
+<p data-localise="result.click a question to review"></p>
+<table id="question-breakdown">
+    <colgroup>
+        <col>
+        <col span="3" class="score">
+        <col>
+    </colgroup>
+    <thead>
+        <tr>
+        <!-- ko if: exam.settings.navigateMode=='sequence' -->
+            <th data-localise="result.question number"></th>
+        <!-- /ko -->
+        <!-- ko if: exam.settings.navigateMode=='menu' -->
+            <th data-localise="question"></th>
+        <!-- /ko -->
+        <th data-bind="text: resultsScoreColumnHeader"></th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- ko foreach: question_groups -->
+            <!-- ko if: $root.exam().showQuestionGroupNames -->
+            <tr class="question-group-header" data-bind="visible: show_name">
+                <th data-bind="text: name, typeset: name"></th>
+                <th class="score-cell" data-bind="html: feedback.plainMessage"></th>
+            </tr>
+            <!-- /ko -->
+            <!-- ko foreach: questions -->
+            <tr class="question" data-bind="click: review, attr: {title: R('result.question review title')}">
+                <td class="name"><a href="#" data-bind="latex: displayName"></a></td>
+                <td class="score-cell" data-bind="html: scoreFeedback.plainMessage"></td>
+            </tr>
+            <!-- /ko -->
+        <!-- /ko -->
+        <!-- ko if: scoreFeedback.showActualMark() || scoreFeedback.showTotalMark() -->
+        <tr class="total">
+            <th scope="row" data-localise="Total"></th>
+            <td class="score-cell">
+                <span class="score" data-bind="html: scoreFeedback.plainMessage"></span>
+                <!-- ko if: scoreFeedback.showActualMark() && scoreFeedback.showTotalMark() -->(<span data-bind="text: percentScore"></span>%)<!-- /ko -->
+            </td>
+        </tr>
+        <!-- /ko -->
+    </tbody>
+</table>
+
+<!-- /ko -->
+
+<div id="end-message" class="alert" data-bind="visible: exam.has_end_message, latex: exam.end_message" localise-data-jme-context-description="exam.end_message"></div>
+
+<!-- ko if: scoreFeedback.showActualMark -->
+<div id="feedback" class="alert results-feedback" data-bind="visible: feedbackMessage()!==null, latex: feedbackMessage" localise-data-jme-context-description="exam.feedback"></div>
+<!-- /ko -->
+
+<div id="performance-summary">
+    <h2 data-localise="result.performance summary"></h2>
+
+    <table class="summary">
+        <tr>
+            <th data-localise="exam.exam name"></th>
+            <td class="break-words" data-bind="html: exam.settings.name"></td>
+        </tr>
+        <tr>
+            <th data-localise="exam.random seed"></th>
+            <td class="break-words" data-bind="html: exam.seed"></td>
+        </tr>
+        <tr data-bind="visible: exam.settings.showStudentName && exam.student_name">
+            <th data-localise="exam.student name"></th>
+            <td class="break-words"><span data-bind="text: exam.student_name"></span><span data-bind="visible: exam.student_id"> (<span data-bind="text: exam.student_id"></span>)</span></td>
+        </tr>
+        <tr>
+            <th data-localise="result.exam start"></th>
+            <td class="break-words"><time data-bind="datetime: startTime"></time></td>
+        </tr>
+        <tr>
+            <th data-localise="result.exam stop"></th>
+            <td class="break-words"><time data-bind="datetime: endTime"></time></td>
+        </tr>
+        <tr>
+            <th data-localise="result.time spent"></th>
+            <td class="break-words"><time data-bind="duration: timeSpent"></time></td>
+        </tr>
+    </table>
+</div>
+
+
+
+<div class="info-buttons">
+    <button class="btn info" data-bind="visible: allowPrinting, click: function(){ window.print(); }, text: printLabel"></button>
+    <button class="btn info" data-bind="visible: allowAttemptDownload, click: download_attempt_data" data-localise="result.download exam object"></button>
+</div>
+
+<p id="finished-text" class="text-center" data-localise="end.exam has finished"></p>
+    </div>
+
+    
+    <footer class="copyright-footer">
+    Created using <a target="_blank" href="https://www.numbas.org.uk">Numbas</a> v9.1, developed by <a target="_blank" href="https://www.newcastle.ac.uk">Newcastle University</a>.
+</footer>
+    
+</div>
+
+                <div id="questionContainer" class="print-visible" data-bind="visible: currentQuestion, css: {review: mode()=='review'}">
+    <div class="contentArea ">
+        <div id="diagnostic-feedback" class="diagnostic-feedback" data-bind="visible: diagnostic_feedback, latex: diagnostic_feedback"></div>
+
+        <div id="questionDisplay" data-bind="foreach: questions">
+            <div class="question-wrapper print-visible" data-bind="promise: html_promise, visible: isCurrentQuestion">
+            </div>
+        </div>
+
+        <footer class="copyright-footer">
+    Created using <a target="_blank" href="https://www.numbas.org.uk">Numbas</a> v9.1, developed by <a target="_blank" href="https://www.newcastle.ac.uk">Newcastle University</a>.
+</footer>
+    </div>
+
+</div>
+            </main>
+        </div>
+    </exam-container>
+</template>
+        <div id="no-stylesheet">
+            <p data-localise="page.no stylesheet loaded"></p>
+        </div>
+
+        <div id="with-stylesheet">
+<div id="die" hidden class="force-default-style">
+    <h1 data-localise="die.numbas failed">Numbas failed</h1>
+    <p data-localise="die.sorry"></p>
+    <div class="error" tabindex="1">
+        <div class="message"></div>
+        <div class="stack"></div>
+    </div>
+</div>
+<div id="loading">
+    <img class="logo center-block" src="resources/numbas-logo.svg" alt="Numbas"/>
+    <progress min="0" max="100" value="0"></progress>
+    <span class="loading-text" data-localise="page.loading">Loading...</span>
+</div>
+
+            
+            <numbas-exam storage="scorm">
+                <script type="application/numbas-exam">// Numbas version: finer_feedback_settings
+{"name": "Test_deg_selv_tallregning", "metadata": {"description": "", "licence": "None specified"}, "duration": 0, "percentPass": 0, "showQuestionGroupNames": false, "shuffleQuestionGroups": false, "showstudentname": true, "question_groups": [{"name": "Group", "pickingStrategy": "all-ordered", "pickQuestions": 1, "questionNames": [""], "variable_overrides": [[]], "questions": [{"name": "Tall_testdegselv", "extensions": [], "custom_part_types": [], "resources": [], "navigation": {"allowregen": true, "showfrontpage": false, "preventleave": false, "typeendtoleave": false}, "contributors": [{"name": "Francesca Azzolini", "profile_url": "https://numbas.mathcentre.ac.uk/accounts/profile/19466/"}], "tags": [], "metadata": {"description": "", "licence": "None specified"}, "statement": "", "advice": "<p>Husk p&aring; regnerekkef&oslash;lgen:</p>\n<ol>\n<li>Parenteser</li>\n<li>Potenser</li>\n<li>Multiplikasjon og Divisjon</li>\n<li>Addisjon og Subtraksjon</li>\n</ol>\n<p>I tillegg m&aring; vi huske &aring; regne fra&nbsp;<strong>venstre til h&oslash;yre</strong>, spesielt n&aring;r vi har flere operasjoner som gjennomf&oslash;res sammtidig!</p>\n<div data-jme-visible=\"cond_neg\">\n<p><span data-jme-visible=\"cond_neg23\">Dersom vi skal plusse p&aring; noe som er negativt, er det samme som &aring; subtrahere med det samme tallet!</span><br/><span data-jme-visible=\"cond_neg23\">Husk:</span></p>\n</div>\n<ul>\n<li><span data-jme-visible=\"cond_neg23\">++ blir +</span></li>\n<li><span data-jme-visible=\"cond_neg23\">--&nbsp; &nbsp;blir +</span></li>\n<li><span data-jme-visible=\"cond_neg23\">+-&nbsp; blir -</span></li>\n<li><span data-jme-visible=\"cond_neg23\">-+&nbsp; blir -</span><span data-jme-visible=\"cond_neg23\"></span></li>\n</ul>\n<p><span data-jme-visible=\"cond1\">Husk at $a^1=a$ (multiplisert med seg selv $1$ gang)</span></p>\n<p><span data-jme-visible=\"cond0\">Husk at $a^0=1$ (multiplisert med seg selv $0$ ganger)&nbsp;</span></p>", "rulesets": {}, "builtin_constants": {"e": true, "pi,\u03c0": true, "i": true, "j": false}, "constants": [], "variables": {"d22": {"name": "d22", "group": "Tall 2.2", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b23": {"name": "b23", "group": "Tall 2.3", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "c23": {"name": "c23", "group": "Tall 2.3", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "d31": {"name": "d31", "group": "Tall 3.1", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "f31": {"name": "f31", "group": "Tall 3.1", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "a32": {"name": "a32", "group": "Tall 3.2", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "a31": {"name": "a31", "group": "Tall 3.1", "definition": "random(0..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b31": {"name": "b31", "group": "Tall 3.1", "definition": "if(a31<=3,random(0..3),random(0,2))", "description": "", "templateType": "anything", "can_override": false}, "c22": {"name": "c22", "group": "Tall 2.2", "definition": "random(-5..5)", "description": "", "templateType": "anything", "can_override": false}, "b22": {"name": "b22", "group": "Tall 2.2", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "c32": {"name": "c32", "group": "Tall 3.2", "definition": "random(0..3)", "description": "", "templateType": "anything", "can_override": false}, "f32": {"name": "f32", "group": "Tall 3.2", "definition": "random(-5..5 except 0 except 1 except -1)", "description": "", "templateType": "anything", "can_override": false}, "d32": {"name": "d32", "group": "Tall 3.2", "definition": "random(-2..2 except 0 except 1)*f32", "description": "", "templateType": "anything", "can_override": false}, "e32": {"name": "e32", "group": "Tall 3.2", "definition": "random(0..3 except 0)", "description": "", "templateType": "anything", "can_override": false}, "a22": {"name": "a22", "group": "Tall 2.2", "definition": "random(-5..5 except 0)*b22", "description": "", "templateType": "anything", "can_override": false}, "e22": {"name": "e22", "group": "Tall 2.2", "definition": "random(-5..5)", "description": "", "templateType": "anything", "can_override": false}, "a21": {"name": "a21", "group": "2.1", "definition": "random(0..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b21": {"name": "b21", "group": "2.1", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "c21": {"name": "c21", "group": "2.1", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "d21": {"name": "d21", "group": "2.1", "definition": "random(0..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "e21": {"name": "e21", "group": "2.1", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "f21": {"name": "f21", "group": "2.1", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "a12": {"name": "a12", "group": "Tall 1.2", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b12": {"name": "b12", "group": "Tall 1.2", "definition": "random(4..7)", "description": "", "templateType": "anything", "can_override": false}, "c12": {"name": "c12", "group": "Tall 1.2", "definition": "random(4..10)", "description": "", "templateType": "anything", "can_override": false}, "a11": {"name": "a11", "group": "Tall 1.1", "definition": "random(0..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b11": {"name": "b11", "group": "Tall 1.1", "definition": "random(0..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "c11": {"name": "c11", "group": "Tall 1.1", "definition": "random(0..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "c31": {"name": "c31", "group": "Tall 3.1", "definition": "random(-5..5)", "description": "", "templateType": "anything", "can_override": false}, "e31": {"name": "e31", "group": "Tall 3.1", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "b32": {"name": "b32", "group": "Tall 3.2", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "a23": {"name": "a23", "group": "Tall 2.3", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "d23": {"name": "d23", "group": "Tall 2.3", "definition": "random(-5..5 except 0)", "description": "", "templateType": "anything", "can_override": false}, "e23": {"name": "e23", "group": "Tall 2.3", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "f23": {"name": "f23", "group": "Tall 2.3", "definition": "random(-10..10 except 0)", "description": "", "templateType": "anything", "can_override": false}, "cond_neg": {"name": "cond_neg", "group": "Conditions", "definition": "b22<0||d22<0||e22<0", "description": "", "templateType": "anything", "can_override": false}, "cond_neg31": {"name": "cond_neg31", "group": "Conditions", "definition": "c31<0||e31<0||f31<0", "description": "", "templateType": "anything", "can_override": false}, "cond_neg3": {"name": "cond_neg3", "group": "Conditions", "definition": "d32<0||f32<0", "description": "", "templateType": "anything", "can_override": false}, "cond_neg23": {"name": "cond_neg23", "group": "Conditions", "definition": "c23<0||d23<0||e23<0", "description": "", "templateType": "anything", "can_override": false}, "cond0": {"name": "cond0", "group": "Conditions", "definition": "b31=0||c32=0||e32=0", "description": "", "templateType": "anything", "can_override": false}, "cond1": {"name": "cond1", "group": "Conditions", "definition": "b31=1||c32=1||e32=1", "description": "", "templateType": "anything", "can_override": false}}, "variablesTest": {"condition": "", "maxRuns": 100}, "ungrouped_variables": [], "variable_groups": [{"name": "2.1", "variables": ["a21", "b21", "c21", "d21", "e21", "f21"]}, {"name": "Tall 1.2", "variables": ["a12", "b12", "c12"]}, {"name": "Tall 1.1", "variables": ["a11", "b11", "c11"]}, {"name": "Tall 2.2", "variables": ["a22", "b22", "c22", "d22", "e22"]}, {"name": "Tall 3.1", "variables": ["a31", "b31", "c31", "d31", "e31", "f31"]}, {"name": "Tall 3.2", "variables": ["a32", "b32", "c32", "d32", "e32", "f32"]}, {"name": "Tall 2.3", "variables": ["a23", "b23", "c23", "d23", "e23", "f23"]}, {"name": "Conditions", "variables": ["cond_neg", "cond_neg31", "cond_neg3", "cond_neg23", "cond0", "cond1"]}], "functions": {}, "preamble": {"js": "", "css": ""}, "parts": [{"type": "numberentry", "useCustomName": true, "customName": "F\u00f8rste sp\u00f8rsm\u00e5l tall", "marks": "56", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [{"label": "Tall 3.1", "rawLabel": "Tall 3.1", "otherPart": 2, "variableReplacements": [], "availabilityCondition": "answered and credit=1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": true}, {"label": "Tall 1.2", "rawLabel": "Tall 1.2", "otherPart": 5, "variableReplacements": [], "availabilityCondition": "answered and credit<1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": false}], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p>Regn ut&nbsp; <!--StartFragment --><span class=\"cf0\">$\\var{a22} \\div$ <span data-jme-visible=\"b22&lt;0\">$($ </span>$\\var{b22}$ <span data-jme-visible=\"b22&lt;0\">$)$ </span>$-$ <span data-jme-visible=\"c22&lt;0\">$($</span>$\\var{c22}$ <span data-jme-visible=\"c22&lt;0\">$)$</span>$+$ <span data-jme-visible=\"d22&lt;0\">$($</span>$\\var{d22}$<span data-jme-visible=\"d22&lt;0\">$)$</span> $\\cdot$</span><span class=\"cf0\">&nbsp;<span data-jme-visible=\"e22&lt;0\">$($</span>$\\var{e22}$<span data-jme-visible=\"e22&lt;0\">$)$</span></span><!--EndFragment --></p>", "minValue": "a22/b22-c22+d22*e22", "maxValue": "a22/b22-c22+d22*e22", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 2.3", "marks": "14", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p style=\"padding-left: 40px;\">Regn ut $\\var{a23} \\cdot\\Bigl( \\var{b23}-$<span data-jme-visible=\"c23&lt;0\">$($</span>$\\var{c23}$<span data-jme-visible=\"c23&lt;0\">$)$</span>$\\Bigr)+$<span data-jme-visible=\"d23&lt;0\">$($</span>$\\var{d23}$<span data-jme-visible=\"d23&lt;0\">$)$</span>$\\cdot \\Bigl(\\var{e23}-$<span data-jme-visible=\"f23&lt;0\">$($</span>$\\var{f23}$<span data-jme-visible=\"f23&lt;0\">$)$</span>$\\Bigr)$</p>", "minValue": "a23*(b23-c23)+d23*(e23-f23)", "maxValue": "a23*(b23-c23)+d23*(e23-f23)", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 3.1", "marks": "29", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [{"label": "Tall 3.2", "rawLabel": "Tall 3.2", "otherPart": 3, "variableReplacements": [], "availabilityCondition": "answered and credit=1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": true}, {"label": "Tall 2.3", "rawLabel": "Tall 2.3", "otherPart": 1, "variableReplacements": [], "availabilityCondition": "answered and credit<1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": true}], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p style=\"padding-left: 40px;\">Regn ut&nbsp; $\\var{a31}^\\var{b31}-$<span data-jme-visible=\"c31&lt;0\">$($</span>$\\var{c31}$<span data-jme-visible=\"c31&lt;0\">$)$</span>$\\cdot\\Bigl(\\var{d31}+$<span data-jme-visible=\"e31&lt;0\">$($</span>$\\var{e31}$<span data-jme-visible=\"e31&lt;0\">$)$</span>$\\Bigr)+$<span data-jme-visible=\"f31&lt;0\">$($</span>$\\var{f31}$<span data-jme-visible=\"f31&lt;0\">$)$</span></p>", "minValue": "a31^b31-c31*(d31+e31)+f31", "maxValue": "a31^b31-c31*(d31+e31)+f31", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 3.2", "marks": "15", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p>Regn ut $\\var{a32}\\cdot\\Bigl( $<span data-jme-visible=\"b32&lt;0\">$($</span>$\\var{b32}$<span data-jme-visible=\"b32&lt;0\">$)$</span>$^\\var{c32}-$<span data-jme-visible=\"d32&lt;0\">$($</span>$\\var{d32}$<span data-jme-visible=\"d32&lt;0\">$)$</span>$^\\var{e32}\\div$<span data-jme-visible=\"f32&lt;0\">$($</span>$\\var{f32}$<span data-jme-visible=\"f32&lt;0\">$)$</span>$ \\Bigr)$</p>", "minValue": "a32*(b32^c32-(d32^e32/f32))", "maxValue": "a32*(b32^c32-(d32^e32/f32))", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 2.1", "marks": "14", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p>Regn ut&nbsp;</p>\n<p>$\\var{a21} \\cdot\\Bigl( \\var{b21}-$<span data-jme-visible=\"c21&lt;0\">$($</span>$\\var{c21}$<span data-jme-visible=\"c21&lt;0\">$)$</span>$\\Bigr)+$<span data-jme-visible=\"d21&lt;0\">$($</span>$\\var{d21}$<span data-jme-visible=\"d21&lt;0\">$)$</span>$\\cdot \\Bigl(\\var{e21}-$<span data-jme-visible=\"f21&lt;0\">$($</span>$\\var{f21}$<span data-jme-visible=\"f21&lt;0\">$)$</span>$\\Bigr)$</p>", "minValue": "a21*(b21-c21)+d21*(e21-f21)", "maxValue": "a21*(b21-c21)+d21*(e21-f21)", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 1.2", "marks": "28", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [{"label": "Tall 2.1", "rawLabel": "Tall 2.1", "otherPart": 4, "variableReplacements": [], "availabilityCondition": "answered and credit=1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": true}, {"label": "Tall 1.1", "rawLabel": "Tall 1.1", "otherPart": 6, "variableReplacements": [], "availabilityCondition": "answered and credit<1", "penalty": "", "penaltyAmount": 0, "showPenaltyHint": true, "lockAfterLeaving": true}], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p>Regn ut&nbsp;$ \\var{a12} - \\var{b12}&nbsp;\\cdot \\var{c12}&nbsp;$</p>", "minValue": "a12-b12*c12", "maxValue": "a12-b12*c12", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}, {"type": "numberentry", "useCustomName": true, "customName": "Tall 1.1", "marks": "14", "scripts": {}, "customMarkingAlgorithm": "", "extendBaseMarkingAlgorithm": true, "unitTests": [], "showCorrectAnswer": true, "showFeedbackIcon": true, "variableReplacements": [], "variableReplacementStrategy": "originalfirst", "nextParts": [], "suggestGoingBack": false, "adaptiveMarkingPenalty": 0, "exploreObjective": "Tall", "prompt": "<p>Regn ut $\\var{a11}\\cdot \\var{b11}+\\var{c11}$</p>", "minValue": "a11*b11+c11", "maxValue": "a11*b11+c11", "correctAnswerFraction": false, "allowFractions": false, "mustBeReduced": false, "mustBeReducedPC": 0, "displayAnswer": "", "showFractionHint": true, "notationStyles": ["plain", "en", "si-en"], "correctAnswerStyle": "plain"}], "partsMode": "explore", "maxMarks": "100", "objectives": [{"name": "Tall", "limit": "100"}], "penalties": [], "objectiveVisibility": "always", "penaltyVisibility": "always"}]}], "allowPrinting": true, "navigation": {"allowregen": true, "reverse": true, "browse": true, "allowsteps": true, "showfrontpage": true, "navigatemode": "sequence", "onleave": {"action": "none", "message": ""}, "preventleave": true, "typeendtoleave": false, "startpassword": "", "autoSubmit": true, "allowAttemptDownload": false, "downloadEncryptionKey": "", "showresultspage": "oncompletion"}, "timing": {"allowPause": true, "timeout": {"action": "none", "message": ""}, "timedwarning": {"action": "none", "message": ""}}, "feedback": {"enterreviewmodeimmediately": true, "showactualmarkwhen": "always", "showtotalmarkwhen": "always", "showanswerstatewhen": "always", "showpartfeedbackmessageswhen": "always", "showexpectedanswerswhen": "inreview", "showadvicewhen": "inreview", "allowrevealanswer": true, "intro": "", "end_message": "", "results_options": {"printquestions": true, "printadvice": true}, "feedbackmessages": [], "reviewshowexpectedanswer": true, "showanswerstate": true, "reviewshowfeedback": true, "showactualmark": true, "showtotalmark": true, "reviewshowscore": true, "reviewshowadvice": true}, "diagnostic": {"knowledge_graph": {"topics": [], "learning_objectives": []}, "script": "diagnosys", "customScript": ""}, "contributors": [{"name": "Francesca Azzolini", "profile_url": "https://numbas.mathcentre.ac.uk/accounts/profile/19466/"}], "extensions": [], "custom_part_types": [], "resources": []}</script>
+                <script type="application/json" slot="extension-data">{}</script>
+            </numbas-exam>
+            
+        </div>
+	</body>
+</html>
